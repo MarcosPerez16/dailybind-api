@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth";
+import salesRouter from "./routes/sales";
 
 dotenv.config();
 
@@ -23,6 +24,8 @@ app.use(
 //route specific middleware
 
 app.use("/auth", authRouter);
+
+app.use("/sales", salesRouter);
 
 app.get("/health", (req, res) => {
   res.json({
