@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth";
 import salesRouter from "./routes/sales";
+import metricsRouter from "./routes/metrics";
 
 dotenv.config();
 
@@ -26,6 +27,8 @@ app.use(
 app.use("/auth", authRouter);
 
 app.use("/sales", salesRouter);
+
+app.use("/metrics", metricsRouter);
 
 app.get("/health", (req, res) => {
   res.json({
