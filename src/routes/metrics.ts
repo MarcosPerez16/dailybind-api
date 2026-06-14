@@ -1,7 +1,6 @@
 import { Router } from "express";
 import prisma from "../utils/prisma";
 import { authenticate, requireAdmin } from "../middleware/auth";
-import { string } from "zod";
 
 const router = Router();
 
