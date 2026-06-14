@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../utils/prisma";
-import { authenticate } from "../middleware/auth";
+import { authenticate, requireAdmin } from "../middleware/auth";
+import { string } from "zod";
 
 const router = Router();
 
@@ -231,5 +232,60 @@ router.get("/bi-limits", authenticate, async (req, res) => {
     res.status(500).json({ message: "Something went wrong" });
   }
 });
+
+// GET /metrics/agent-total/:agentId — Admin only
+// Returns total sales count and premium for one agent across any date range
+router.get(
+  "/agent-total/:agentId",
+  authenticate, // must be logged in
+  requireAdmin, // must be ADMIN role
+  async (req, res) => {
+    const { agentId } = req.params as { agentId: string };
+
+    // optional date range from query params e.g. ?startDate=2026-01-01&endDate=2026-04-30
+    const { startDate, endDate } = req.query as {
+      startDate?: string;
+      endDate?: string;
+    };
+
+    try {
+      // base filter — always applied
+      const where: {
+        agentId: string;
+        isVoided: boolean;
+        date?: { gte: Date; lte: Date };
+      } = {
+        agentId,
+        isVoided: false,
+      };
+
+      // only add date filter if both dates were provided
+      if (startDate && endDate) {
+        where.date = {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        };
+      }
+
+      // aggregate totals for this one agent
+      const result = await prisma.sale.aggregate({
+        where,
+        _count: { id: true }, // total number of sales
+        _sum: { premiumAmount: true }, // total dollar amount
+      });
+
+      // shape the response — clean and readable for the frontend
+      res.json({
+        agentId,
+        totalSales: result._count.id,
+        totalPremium: result._sum.premiumAmount,
+        startDate: startDate || "all time",
+        endDate: endDate || "all time",
+      });
+    } catch {
+      res.status(500).json({ message: "Something went wrong" });
+    }
+  },
+);
 
 export default router;

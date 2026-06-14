@@ -37,5 +37,6 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
     res.status(403).json({ message: "Access denied" });
     return;
   }
+  //role is ADMIN - pass to route handler
   next();
 }
