@@ -26,7 +26,26 @@ router.get("/summary", authenticate, async (req, res) => {
         premiumAmount: true, //sum up the premiums
       },
     });
-    res.json(results);
+
+    const agentIds = results.map((r) => r.agentId);
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: agentIds } },
+      select: { id: true, name: true },
+    });
+
+    const summary = results.map((result) => {
+      const user = users.find((u) => u.id === result.agentId);
+
+      return {
+        agentId: result.agentId,
+        agentName: user?.name ?? "Unknown",
+        totalSales: result._count.id,
+        totalPremium: result._sum.premiumAmount,
+      };
+    });
+
+    res.json(summary);
   } catch {
     res.status(500).json({ message: "Something went wrong" });
   }
@@ -39,16 +58,16 @@ router.get("/bundles", authenticate, async (req, res) => {
   try {
     // Query 1 — count ALL auto sales per agent this month
     const totalAutoSales = await prisma.sale.groupBy({
-      by: ["agentId"], // one result per agent
+      by: ["agentId"],
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1), // first day
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0), // last day
+          gte: new Date(now.getFullYear(), now.getMonth(), 1),
+          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
         },
         policyType: "AUTO",
       },
-      _count: { id: true }, // count number of sales
+      _count: { id: true },
     });
 
     // Query 2 — count only BUNDLED auto sales per agent this month
@@ -61,30 +80,37 @@ router.get("/bundles", authenticate, async (req, res) => {
           lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
         },
         policyType: "AUTO",
-        isBundled: true, // only bundled entries
+        isBundled: true,
       },
       _count: { id: true },
     });
 
+    // fetch agent names for all agents in results
+    const agentIds = totalAutoSales.map((r) => r.agentId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: agentIds } },
+      select: { id: true, name: true },
+    });
+
     // Combine both queries to calculate percentage per agent
     const bundlePercentages = totalAutoSales.map((agentTotal) => {
-      // find matching bundled entry for this agent — undefined if none
       const bundled = bundledAutoSales.find(
         (b) => b.agentId === agentTotal.agentId,
       );
+      // find matching user name
+      const user = users.find((u) => u.id === agentTotal.agentId);
 
-      const bundledCount = bundled?._count.id ?? 0; // default to 0 if no bundled sales
+      const bundledCount = bundled?._count.id ?? 0;
       const totalCount = agentTotal._count.id;
 
-      // (bundled / total) * 100 — avoid dividing by zero
       const percentage =
         totalCount > 0
           ? Math.round((bundledCount / totalCount) * 100 * 10) / 10
           : 0;
 
-      // return one result per agent
       return {
         agentId: agentTotal.agentId,
+        agentName: user?.name ?? "Unknown", // attach agent name
         bundledCount,
         totalAutoSales: totalCount,
         bundlePercentage: percentage,
@@ -104,16 +130,16 @@ router.get("/pif", authenticate, async (req, res) => {
   try {
     // Query 1 — count ALL auto sales per agent this month
     const totalPaidInFullSales = await prisma.sale.groupBy({
-      by: ["agentId"], // one result per agent
+      by: ["agentId"],
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1), // first day
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0), // last day
+          gte: new Date(now.getFullYear(), now.getMonth(), 1),
+          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
         },
         policyType: "AUTO",
       },
-      _count: { id: true }, // count number of sales
+      _count: { id: true },
     });
 
     // Query 2 — count only PIF auto sales per agent this month
@@ -126,28 +152,35 @@ router.get("/pif", authenticate, async (req, res) => {
           lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
         },
         policyType: "AUTO",
-        isPaidInFull: true, // only PIF entries
+        isPaidInFull: true,
       },
       _count: { id: true },
     });
 
+    // fetch agent names for all agents in results
+    const agentIds = totalPaidInFullSales.map((r) => r.agentId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: agentIds } },
+      select: { id: true, name: true },
+    });
+
     // Combine both queries to calculate percentage per agent
     const pifPercentages = totalPaidInFullSales.map((agentTotal) => {
-      // find matching PIF entry for this agent — undefined if none
       const pif = paidInFull.find((p) => p.agentId === agentTotal.agentId);
+      // find matching user name
+      const user = users.find((u) => u.id === agentTotal.agentId);
 
-      const pifCount = pif?._count.id ?? 0; // default to 0 if no PIF sales
+      const pifCount = pif?._count.id ?? 0;
       const totalCount = agentTotal._count.id;
 
-      // (pif / total) * 100 — avoid dividing by zero
       const percentage =
         totalCount > 0
           ? Math.round((pifCount / totalCount) * 100 * 10) / 10
           : 0;
 
-      // return one result per agent
       return {
         agentId: agentTotal.agentId,
+        agentName: user?.name ?? "Unknown", // attach agent name
         pifCount,
         totalAutoSales: totalCount,
         pifPercentage: percentage,
