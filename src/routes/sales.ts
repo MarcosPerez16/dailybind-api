@@ -44,18 +44,21 @@ router.post("/", authenticate, async (req, res) => {
   }
 });
 
-//GET /sales - fetch all non voided sales for current month
+//GET /sales - fetch all non voided sales
 
 router.get("/", authenticate, async (req, res) => {
-  try {
-    const now = new Date();
+  const { month, year } = req.query;
+  const now = new Date();
+  const targetYear = year ? parseInt(year as string) : now.getFullYear();
+  const targetMonth = month ? parseInt(month as string) - 1 : now.getMonth();
 
+  try {
     const sales = await prisma.sale.findMany({
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1), // first day
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0), // last day
+          gte: new Date(targetYear, targetMonth, 1),
+          lte: new Date(targetYear, targetMonth + 1, 0),
         },
       },
       orderBy: {
