@@ -22,6 +22,14 @@ enum PolicyType {
   HOME
   RENTERS
   CYCLE
+  RV
+  ATV
+  BOAT
+  CLASSIC_CAR
+  MEXICO
+  UMBRELLA
+  JEWELRY
+  IDENTITY
 }
 
 enum BiLimit {
