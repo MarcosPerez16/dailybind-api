@@ -4,10 +4,12 @@ import { authenticate, requireAdmin } from "../middleware/auth";
 
 const router = Router();
 
-//GET /metrics/summary - calculates total sales count and total premium per agent for the current month
-
+//GET /metrics/summary - calculates total sales count and total premium per agent
 router.get("/summary", authenticate, async (req, res) => {
+  const { month, year } = req.query;
   const now = new Date();
+  const targetYear = year ? parseInt(year as string) : now.getFullYear();
+  const targetMonth = month ? parseInt(month as string) - 1 : now.getMonth();
 
   try {
     const results = await prisma.sale.groupBy({
@@ -15,8 +17,8 @@ router.get("/summary", authenticate, async (req, res) => {
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1), // first day
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0), // last day
+          gte: new Date(targetYear, targetMonth, 1), // first day
+          lte: new Date(targetYear, targetMonth + 1, 0), // last day
         },
       },
       _count: {
@@ -51,23 +53,26 @@ router.get("/summary", authenticate, async (req, res) => {
   }
 });
 
-// GET /metrics/bundles — bundle percentage per agent for current month
+// GET /metrics/bundles — bundle percentage per agent
 router.get("/bundles", authenticate, async (req, res) => {
+  const { month, year } = req.query;
   const now = new Date();
+  const targetYear = year ? parseInt(year as string) : now.getFullYear();
+  const targetMonth = month ? parseInt(month as string) - 1 : now.getMonth();
 
   try {
     // Query 1 — count ALL auto sales per agent this month
     const totalAutoSales = await prisma.sale.groupBy({
-      by: ["agentId"],
+      by: ["agentId"], // one result per agent
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1),
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+          gte: new Date(targetYear, targetMonth, 1), // first day
+          lte: new Date(targetYear, targetMonth + 1, 0), // last day
         },
         policyType: "AUTO",
       },
-      _count: { id: true },
+      _count: { id: true }, // count number of sales
     });
 
     // Query 2 — count only BUNDLED auto sales per agent this month
@@ -76,11 +81,11 @@ router.get("/bundles", authenticate, async (req, res) => {
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1),
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+          gte: new Date(targetYear, targetMonth, 1),
+          lte: new Date(targetYear, targetMonth + 1, 0),
         },
         policyType: "AUTO",
-        isBundled: true,
+        isBundled: true, // only bundled entries
       },
       _count: { id: true },
     });
@@ -100,9 +105,10 @@ router.get("/bundles", authenticate, async (req, res) => {
       // find matching user name
       const user = users.find((u) => u.id === agentTotal.agentId);
 
-      const bundledCount = bundled?._count.id ?? 0;
+      const bundledCount = bundled?._count.id ?? 0; // default to 0 if no bundled sales
       const totalCount = agentTotal._count.id;
 
+      // (bundled / total) * 100 — avoid dividing by zero
       const percentage =
         totalCount > 0
           ? Math.round((bundledCount / totalCount) * 100 * 10) / 10
@@ -123,23 +129,26 @@ router.get("/bundles", authenticate, async (req, res) => {
   }
 });
 
-// GET /metrics/pif — paid in full percentage per agent for current month
+// GET /metrics/pif — paid in full percentage per agent
 router.get("/pif", authenticate, async (req, res) => {
+  const { month, year } = req.query;
   const now = new Date();
+  const targetYear = year ? parseInt(year as string) : now.getFullYear();
+  const targetMonth = month ? parseInt(month as string) - 1 : now.getMonth();
 
   try {
     // Query 1 — count ALL auto sales per agent this month
     const totalPaidInFullSales = await prisma.sale.groupBy({
-      by: ["agentId"],
+      by: ["agentId"], // one result per agent
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1),
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+          gte: new Date(targetYear, targetMonth, 1), // first day
+          lte: new Date(targetYear, targetMonth + 1, 0), // last day
         },
         policyType: "AUTO",
       },
-      _count: { id: true },
+      _count: { id: true }, // count number of sales
     });
 
     // Query 2 — count only PIF auto sales per agent this month
@@ -148,11 +157,11 @@ router.get("/pif", authenticate, async (req, res) => {
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1),
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+          gte: new Date(targetYear, targetMonth, 1),
+          lte: new Date(targetYear, targetMonth + 1, 0),
         },
         policyType: "AUTO",
-        isPaidInFull: true,
+        isPaidInFull: true, // only PIF entries
       },
       _count: { id: true },
     });
@@ -170,9 +179,10 @@ router.get("/pif", authenticate, async (req, res) => {
       // find matching user name
       const user = users.find((u) => u.id === agentTotal.agentId);
 
-      const pifCount = pif?._count.id ?? 0;
+      const pifCount = pif?._count.id ?? 0; // default to 0 if no PIF sales
       const totalCount = agentTotal._count.id;
 
+      // (pif / total) * 100 — avoid dividing by zero
       const percentage =
         totalCount > 0
           ? Math.round((pifCount / totalCount) * 100 * 10) / 10
@@ -193,9 +203,12 @@ router.get("/pif", authenticate, async (req, res) => {
   }
 });
 
-// GET /metrics/bi-limits — BI limit tier breakdown per agent for current month
+// GET /metrics/bi-limits — BI limit tier breakdown per agent
 router.get("/bi-limits", authenticate, async (req, res) => {
+  const { month, year } = req.query;
   const now = new Date();
+  const targetYear = year ? parseInt(year as string) : now.getFullYear();
+  const targetMonth = month ? parseInt(month as string) - 1 : now.getMonth();
 
   try {
     // Single query — group by BOTH agentId and biLimit
@@ -205,8 +218,8 @@ router.get("/bi-limits", authenticate, async (req, res) => {
       where: {
         isVoided: false,
         date: {
-          gte: new Date(now.getFullYear(), now.getMonth(), 1),
-          lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+          gte: new Date(targetYear, targetMonth, 1),
+          lte: new Date(targetYear, targetMonth + 1, 0),
         },
         policyType: "AUTO", // BI limits only apply to auto
       },
