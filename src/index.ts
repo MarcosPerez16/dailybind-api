@@ -6,6 +6,7 @@ import authRouter from "./routes/auth";
 import salesRouter from "./routes/sales";
 import metricsRouter from "./routes/metrics";
 import usersRouter from "./routes/users";
+import accountRouter from "./routes/account";
 
 dotenv.config();
 
@@ -32,6 +33,8 @@ app.use("/sales", salesRouter);
 app.use("/metrics", metricsRouter);
 
 app.use("/users", usersRouter);
+
+app.use("/account", accountRouter);
 
 app.get("/health", (req, res) => {
   res.json({
